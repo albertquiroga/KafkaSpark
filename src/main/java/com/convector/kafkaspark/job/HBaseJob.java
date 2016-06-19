@@ -50,35 +50,51 @@ public class HBaseJob {
         
         validations.foreachRDD(new Function<JavaRDD<String>,Void>(){
         	public Void call(JavaRDD<String> rdd) {
-        		rdd.foreach(new VoidFunction<String>() {
-        			public void call(String s) {
+        		rdd.foreachPartition(new VoidFunction<Iterator<String>>(){
+        			public void call(Iterator<String> validations) {
         				Configuration config = HBaseConfiguration.create();
-        				Connection connection;
-        				Table table = null;
+						Connection connection = null;
 						try {
 							connection = ConnectionFactory.createConnection(config);
-							table = connection.getTable(TableName.valueOf("kafkavalidations"));
-						} catch (IOException e1) {
-							e1.printStackTrace();
+						} catch (IOException e) {
+							e.printStackTrace();
 						}
-        				
-        				JSONObject fullJson = new JSONObject(s);
-        				Put put = new Put(fullJson.get("rowkey").toString().getBytes());
-        				JSONArray qualifiers = fullJson.getJSONArray("qualifiers");
-        				String rowkey = fullJson.getString("rowkey");
-        				String timestamp = fullJson.getString("timestamp");
-        				String out = rowkey + "||" + timestamp + "||";
-        				for(int i = 0; i<qualifiers.length(); i++) {
-        					JSONObject qualifier = qualifiers.getJSONObject(i);
-        					put.addColumn(qualifier.getString("family").getBytes(), qualifier.getString("name").getBytes(), Long.parseLong(timestamp), qualifier.getString("value").getBytes());
-        					out.concat(qualifier.getString("family")+":"+qualifier.getString("name")+":"+qualifier.getString("value"));
-        				}
-        				System.out.println(out);
-        				try {
-        		            table.put(put);
-        		        } catch (IOException e) {
-        		            e.printStackTrace();
-        		        }
+						Table table = null;
+						try {
+							table = connection.getTable(TableName.valueOf("kafkavalidations"));
+						} catch (IOException e) {
+							e.printStackTrace();
+						}
+						
+						while(validations.hasNext()){
+							JSONObject fullJSON = new JSONObject(validations.next());
+							String rowKey = fullJSON.getString("rowkey");
+							String timestamp = fullJSON.getString("timestamp");
+							
+							JSONArray qualifiers = fullJSON.getJSONArray("qualifiers");
+							Put put = new Put(rowKey.getBytes());
+							
+							for(int i=0; i<qualifiers.length(); i++){
+								JSONObject qualifier = qualifiers.getJSONObject(i);
+								String family = qualifier.getString("family");
+								String name = qualifier.getString("name");
+								String value = qualifier.getString("value");
+								put.addColumn(family.getBytes(), name.getBytes(), value.getBytes());
+							}
+							
+							try {
+								table.put(put);
+							} catch (IOException e) {
+								e.printStackTrace();
+							}
+						}
+						try {
+							table.close();
+							connection.close();
+						} catch (IOException e) {
+							// TODO Auto-generated catch block
+							e.printStackTrace();
+						}
         			}
         		});
         		return null;

@@ -1,5 +1,6 @@
 package com.convector.kafkaspark.main;
 
+import com.convector.kafkaspark.job.AggregateJob;
 import com.convector.kafkaspark.job.HBaseJob;
 import com.convector.kafkaspark.job.PrintJob;
 
@@ -9,12 +10,19 @@ import com.convector.kafkaspark.job.PrintJob;
 public class Main {
 
     public static void main(String[] args ) {
-        if(args[0].equals("printjob")){
-        	PrintJob.run();        	
-        }
-        else if (args[0].equals("hbasejob")){
-        	HBaseJob.run();
-        }
-    	
+    	try{
+    		if(args[0].equals("printjob")){
+            	PrintJob.run();        	
+            }
+            else if (args[0].equals("hbasejob")){
+            	HBaseJob.run();
+            }
+            else if (args[0].equals("aggregate")){
+            	AggregateJob.run();
+            }
+    	} catch (Exception e) {
+    		e.printStackTrace();
+    	}
+        
     }
 }
