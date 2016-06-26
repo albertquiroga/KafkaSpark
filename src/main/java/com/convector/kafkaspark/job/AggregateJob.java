@@ -34,7 +34,7 @@ public class AggregateJob {
 		SparkConf conf = new SparkConf().setAppName("Convector").setMaster("spark://master:7077");
         JavaSparkContext context = new JavaSparkContext(conf);
         context.setLogLevel("WARN");
-        JavaStreamingContext streamingContext = new JavaStreamingContext(context, new Duration(1000));
+        JavaStreamingContext streamingContext = new JavaStreamingContext(context, new Duration(10*1000));
         
         streamingContext.checkpoint(Files.createTempDir().getAbsolutePath());
 
@@ -46,7 +46,7 @@ public class AggregateJob {
         	public Tuple2<String,Integer> call(Tuple2<String,String> in){
         		JSONObject fullJSON = new JSONObject(in._2);
         		JSONArray array = fullJSON.getJSONArray("qualifiers");
-        		JSONObject estacio = array.getJSONObject(2);
+        		JSONObject estacio = array.getJSONObject(1);
         		return new Tuple2<String,Integer>(estacio.getString("value"),1);
         	}
         });
@@ -55,17 +55,16 @@ public class AggregateJob {
         	public Integer call(Integer i1, Integer i2){
         		return i1+i2;
         	}
-        }, new Duration(60*5*1000), new Duration(1*1000));
+        }, new Duration(60*5*1000), new Duration(10*1000));
         
         counts.print();
         
         counts.foreachRDD(new Function<JavaPairRDD<String,Integer>,Void>(){
         	public Void call(JavaPairRDD<String,Integer> rdd) throws Exception {
-        		final CartoClient cartoClient = new CartoClient();
+        		CartoDBClientIF cartoClient = new ApiKeyCartoDBClient("cteixidogalvez", "7977f5eaebeb6279ca4b9224a1f2988f14ee1824");
         		cartoClient.executeQuery("DELETE FROM validacions_metro_online;");
         		rdd.foreachPartition(new VoidFunction<Iterator<Tuple2<String,Integer>>>(){
 					public void call(Iterator<Tuple2<String, Integer>> agregats) throws Exception {
-						int counter = 0;
 						Timestamp t = new Timestamp(System.currentTimeMillis());
 						CartoDBClientIF cartoDBCLient = null;
 						try{
@@ -74,19 +73,19 @@ public class AggregateJob {
 							e.printStackTrace();
 						}
 						while(agregats.hasNext()){
-							counter = counter+1;
 							Tuple2<String,Integer> tuple = agregats.next();
+							String subQuery = "(the_geom,codi_estacio,instant_pas,validacions) VALUES("
+									+ "ST_SetSRID(ST_Point(" + Coordinater.getCoordinates(tuple._1) + "),4326),"
+									+ tuple._1() + ","
+									+ "TO_TIMESTAMP('" + t.toString() + "','YYYY-MM-DD HH24:MI:SS.MS'),"
+									+ tuple._2().toString() + ");";
 							try{
-								cartoDBCLient.executeQuery("INSERT INTO validacions_metro_online (cartodb_id,the_geom,codi_estacio,instant_pas,validacions) VALUES(" + counter + ","
-								+ "ST_SetSRID(ST_Point(-110, 43),4326),"
-								+ tuple._1() + ","
-								+ "TO_DATE('" + t.toString() + "','YYYY-MM-DD HH24:MI:SS.MS'),"
-								+ tuple._2().toString() + ");");
+								cartoDBCLient.executeQuery("INSERT INTO validacions_metro_online " 			+ subQuery);
+								cartoDBCLient.executeQuery("INSERT INTO validacions_metro_online_animacio " + subQuery);
 							} catch (Exception e){
 								e.printStackTrace();
 							}
 						}
-						//cartoDBCLient.executeQuery("UPDATE yourtable SET yourvalue = 'test' WHERE yourid = 1");
 					}
         		});
         		return null;

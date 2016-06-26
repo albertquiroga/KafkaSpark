@@ -34,7 +34,7 @@ public class PrintJob {
         JavaDStream<String> validations = kafkaStream.map(new Function<Tuple2<String,String>,String>(){
             public String call(Tuple2<String,String> tuple) throws Exception {
                 JSONObject json = new JSONObject(tuple._2);
-                return json.get("rowkey").toString();
+                return json.get("qualifiers").toString();
             }
         });
         validations.print();

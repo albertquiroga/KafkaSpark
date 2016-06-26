@@ -17,7 +17,7 @@
                 </os>
             </activation>
             <properties>
-                <toolsjar>C:\Program Files\Java\jdk1.8.0_65\lib\tools.jar</toolsjar>
+                <toolsjar>C:\Program Files\Java\jdk1.8.0_91\lib\tools.jar</toolsjar>
             </properties>
         </profile>
         <profile>
